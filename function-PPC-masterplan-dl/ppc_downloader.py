@@ -60,10 +60,18 @@ class PPCDownloader:
             return r.read().decode('utf-8', errors='replace')
 
     def discover(self):
-        """Community page paths from the /communities/ index (no hardcoded IDs)."""
-        h = self.get(self.INDEX)
-        paths = sorted(set(re.findall(r'/communities/[a-z\-]+/[a-z\-]+/?', h)))
-        return [{'company': 'ppc', 'slug': p.strip('/').split('/')[-1], 'url': self.BASE + p}
+        """Community paths: /communities/ index UNION robots.txt sitemaps.
+        (robots catches microsites the index omits.) Failures per community
+        are handled at fetch time; use discover_communities.py --notify
+        for validated new/gone alerts."""
+        try:
+            from discover_communities import from_index, from_robots, EXCLUDE
+            paths = sorted((set(from_index()) | set(from_robots())) - set(EXCLUDE))
+        except Exception:
+            h = self.get(self.INDEX)
+            paths = sorted(set(p.strip('/') for p in
+                               re.findall(r'/communities/[a-z\-]+/[a-z\-]+/?', h)))
+        return [{'company': 'ppc', 'slug': p.split('/')[-1], 'url': self.BASE + '/' + p}
                 for p in paths]
 
     @staticmethod
