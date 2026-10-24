@@ -45,7 +45,7 @@ class PPCDownloader:
     INDEX = BASE + '/communities/'
     UA = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36'}
     TESTING = os.environ.get('TESTING', '') == '1'
-    LOCAL = os.environ.get('LOCAL', '1') != '0' or '--upload' not in sys.argv
+    LOCAL = not (os.environ.get('LOCAL') in ('0', 'false', 'no') or '--upload' in sys.argv)
 
     def __init__(self):
         self.communities = self.discover()
