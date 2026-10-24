@@ -68,13 +68,19 @@ class PPCDownloader:
 
     @staticmethod
     def extract_lotconfig(html):
+        out = {}
         i = html.find('var lotConfig = ')
-        if i < 0:
-            return None
-        j = html.find('=', i) + 1
-        dec = json.JSONDecoder()
-        data, _ = dec.raw_decode(html[j:].lstrip())
-        return data
+        if i >= 0:
+            j = html.find('=', i) + 1
+            dec = json.JSONDecoder()
+            out['lotConfig'], _ = dec.raw_decode(html[j:].lstrip())
+        m = re.search(r'var mapConfig = (\{.*?\});', html, re.S)
+        if m:
+            try:
+                out['mapConfig'] = json.loads(m.group(1))
+            except Exception:
+                pass
+        return out or None
 
     def fetch_community(self, community):
         html = self.get(community['url'])
@@ -86,17 +92,19 @@ class PPCDownloader:
     @staticmethod
     def to_json(community, cfg):
         return json.dumps({'community': community['slug'], 'url': community['url'],
-                           'company': community['company'], 'lotConfig': cfg}, indent=1)
+                           'company': community['company'], 'lotConfig': cfg.get('lotConfig', {}),
+                           'mapConfig': cfg.get('mapConfig', {})}, indent=1)
 
     @staticmethod
     def to_csv(community, cfg, date_str):
-        live = {str(x.get('lot_id')): x for x in cfg.get('lots_data', [])}
+        lots_cfg = cfg.get('lotConfig', {})
+        live = {str(x.get('lot_id')): x for x in lots_cfg.get('lots_data', [])}
         out = io.StringIO()
         w = csv.writer(out)
         w.writerow(['date', 'company', 'community', 'lot_id', 'lot_number', 'lot_name',
                     'stage_name', 'lot_status', 'lot_post_status', 'price', 'frontage',
                     'size', 'product_type', 'bedrooms', 'bathrooms', 'garage_spaces'])
-        for lot in cfg.get('all_lots_with_status', []):
+        for lot in lots_cfg.get('all_lots_with_status', []):
             lid = str(lot.get('lot_id', ''))
             lv = live.get(lid, {})
             w.writerow([date_str, community['company'], community['slug'], lid,
@@ -124,8 +132,9 @@ class PPCDownloader:
             print(f"[{i + 1}/{len(self.communities)}] {c['slug']} ...")
             try:
                 cfg = self.fetch_community(c)
-                n_all = len(cfg.get('all_lots_with_status', []))
-                n_live = len(cfg.get('lots_data', []))
+                lots_cfg = cfg.get('lotConfig', {})
+                n_all = len(lots_cfg.get('all_lots_with_status', []))
+                n_live = len(lots_cfg.get('lots_data', []))
                 print(f'  lots={n_all} listed={n_live}')
                 base = f'{ts}-ppc-website-masterplan-data-{c["slug"]}'
                 if self.LOCAL:
