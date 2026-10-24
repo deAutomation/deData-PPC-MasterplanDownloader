@@ -35,6 +35,7 @@ steps:
       - --tasks=1
       - --task-timeout=600s
       - --parallelism=1
+      - --set-env-vars=LOCAL=0
 
 options:
   logging: CLOUD_LOGGING_ONLY
