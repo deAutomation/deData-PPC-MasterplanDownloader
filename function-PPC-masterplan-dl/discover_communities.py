@@ -7,7 +7,9 @@
 #   2. robots.txt sitemap_index entries (catches microsites the index omits,
 #      e.g. the-landing-strathpine, hummingbird-rise)
 # Validation: URL must return 200 AND embed `var lotConfig` (else flagged, not tracked).
-# New/gone/changed vs last snapshot. --notify raises a Todoist task on news.
+# New/gone/changed vs last snapshot. --notify raises a Todoist task on news
+# (needs TODOIST_TOKEN + TODOIST_PROJECT_ID env; falls back to
+# ~/.hermes/todoist_token locally; silently skips in Cloud Run).
 #
 #   python3 discover_communities.py [--notify]
 
@@ -25,8 +27,10 @@ BASE = 'https://www.peet.com.au'
 # estates: Forestville, Yanchep, Tonsley...). Tracking it as an estate would
 # double-count, so it is excluded from auto-discovery.
 EXCLUDE = {'communities/queensland/spring-mountain'}
-TODOIST_TOKEN = os.path.expanduser('~/.hermes/todoist_token')
-TODOIST_PROJECT = '6Crf9749wm39GQH7'  # deAutomation
+TODOIST_TOKEN = (os.environ.get('TODOIST_TOKEN') or
+                 (open(os.path.expanduser('~/.hermes/todoist_token')).read().strip()
+                  if os.path.exists(os.path.expanduser('~/.hermes/todoist_token')) else ''))
+TODOIST_PROJECT = os.environ.get('TODOIST_PROJECT_ID', '')  # no default: notifications stay off unless configured
 
 
 def get(url):
@@ -69,12 +73,14 @@ def validate(path):
 
 def notify_todoist(text):
     import urllib.parse
-    token = open(TODOIST_TOKEN).read().strip()
+    if not TODOIST_TOKEN or not TODOIST_PROJECT:
+        print('  notify skipped (TODOIST_TOKEN / TODOIST_PROJECT_ID not set)')
+        return {}
     data = urllib.parse.urlencode(
         {'content': text, 'project_id': TODOIST_PROJECT}).encode()
     req = urllib.request.Request(
         'https://api.todoist.com/api/v1/tasks', data=data,
-        headers={'Authorization': f'Bearer {token}',
+        headers={'Authorization': f'Bearer {TODOIST_TOKEN}',
                  'Content-Type': 'application/x-www-form-urlencoded'})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode())
@@ -102,10 +108,11 @@ def main():
         print('NEWS:')
         for n in news:
             print('  !', n)
-        if notify and os.path.exists(TODOIST_TOKEN):
+        if notify:
             t = notify_todoist('Peet tracker: ' + '; '.join(news) +
                                ' (auto-discovery)')
-            print('  todoist task:', t.get('id'))
+            if t.get('id'):
+                print('  todoist task:', t.get('id'))
     else:
         print('no changes since last snapshot')
     os.makedirs(os.path.dirname(SNAP), exist_ok=True)
