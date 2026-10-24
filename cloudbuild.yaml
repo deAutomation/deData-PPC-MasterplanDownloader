@@ -1,0 +1,40 @@
+#Builds Cloud Function(s)
+#BMD 2025-04-15 ADL
+#https://stackoverflow.com/questions/60535060/how-to-deploy-multiple-functions-from-a-monorepo-using-cloud-build-but-only-one
+
+# Deploy PPC-Masterplan-DL  AS A CLOUD RUN JOB!!!!
+# Same pattern as sgp-masterplan-job / cwp-masterplan-job / lic-masterplan-job.
+
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', '-t', 'gcr.io/lic-data-452300/ppc-masterplan-job', '.'
+    ]
+    dir: 'function-PPC-masterplan-dl'
+
+  # Push the image to Artifact/Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push', 'gcr.io/lic-data-452300/ppc-masterplan-job'
+    ]
+
+  # Deploy the Cloud Run Job
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - jobs
+      - deploy
+      - ppc-masterplan-job
+      - --image=gcr.io/lic-data-452300/ppc-masterplan-job
+      - --region=australia-southeast1
+      - --memory=512Mi
+      - --service-account=259851748981-compute@developer.gserviceaccount.com
+      - --max-retries=1
+      - --tasks=1
+      - --task-timeout=600s
+      - --parallelism=1
+
+options:
+  logging: CLOUD_LOGGING_ONLY
