@@ -22,6 +22,7 @@
 #   LOCAL=0 (or --upload) pushes to GCS. TESTING=1 limits to 2 communities.
 
 import csv
+import gzip
 import io
 import json
 import os
@@ -126,10 +127,15 @@ class PPCDownloader:
 
     def upload_to_bucket(self, blob_name, content):
         from google.cloud import storage
+        raw = content.encode('utf-8')
+        blob_name = blob_name if blob_name.endswith('.gz') else blob_name + '.gz'
         client = storage.Client()
         bucket = client.bucket(self.BUCKET_NAME)
-        bucket.blob(blob_name).upload_from_string(content)
-        print(f'Uploaded {blob_name}.')
+        blob = bucket.blob(blob_name)
+        blob.content_encoding = 'gzip'
+        blob.upload_from_string(gzip.compress(raw),
+                                content_type='application/json' if '.json' in blob_name else 'text/csv')
+        print(f'Uploaded {blob_name} ({len(raw)} -> {len(gzip.compress(raw))} bytes).')
 
     def run(self):
         now = datetime.now(ADL) if ADL else datetime.now()

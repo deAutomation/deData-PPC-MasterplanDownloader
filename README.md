@@ -105,6 +105,10 @@ Full cards with boundary maps: [`function-PPC-masterplan-dl/charts/estates/`](fu
 (bucket `masterplans`) instead of disk. Needs ADC or a service-account key —
 same IAM as the SGP job (storage.objectViewer + datastore.user on the target project).
 
+Objects are stored **gzipped** (`*.json.gz`, `*.csv.gz`, `content-encoding: gzip`,
+~7% of raw size). Local `_outputfiles/` stays plain JSON/CSV for readability.
+Any future ETL must gunzip on read (`gzip.open(..., 'rt')`).
+
 ## Deploy
 Cloud Run Job via `cloudbuild.yaml` (`ppc-masterplan-job`, 600s timeout for ~33 pages).
 **CI/CD only — never deploy by hand.** Push to main; pipelines carry it.
