@@ -161,6 +161,37 @@ def main():
                 'generated': datetime.now().isoformat(timespec='seconds')}
     json.dump(manifest, open(os.path.join(OUT, 'latest.json'), 'w'), indent=1)
     print(f'estates={len(estates)} lots={total} listed={listed} -> charts/')
+    write_readme_table(estates, date)
+
+
+def write_readme_table(estates, date):
+    """Regenerate the per-estate table in README.md between markers."""
+    rows = []
+    for slug in sorted(estates, key=lambda s: -len(estates[s]['lots'])):
+        e = estates[slug]
+        n = len(e['lots'])
+        cnt = Counter(str(l.get('lot_status', '?')) for l in e['lots'])
+        sold = cnt.get('7', 0)
+        pct = f'{100 * sold / n:.0f}%' if n else '—'
+        rows.append(f'| [{slug}](function-PPC-masterplan-dl/charts/estates/{slug}.png) '
+                    f'| {n} | {len(e["listed"])} | {sold} ({pct}) '
+                    f'| 2:{cnt.get("2", 0)} 4:{cnt.get("4", 0)} 5:{cnt.get("5", 0)} '
+                    f'1:{cnt.get("1", 0)} |')
+    table = ('| Estate (click for card) | Lots | Listed | Sold 7 | Avail 2 · Fut 4 · Other |\n'
+             '|---|---|---|---|---|\n' + '\n'.join(rows) + f'\n\n*Snapshot {date}. Codes: 7 sold · 2 available · 4 future · 1/5/3/8 mid-states.*\n')
+    rp = os.path.join(HERE, '..', 'README.md')
+    if not os.path.exists(rp):
+        print('README not found, skipping table embed')
+        return
+    md = open(rp).read()
+    start, end = '<!-- ESTATE_TABLE:START -->', '<!-- ESTATE_TABLE:END -->'
+    if start not in md or end not in md:
+        print('markers missing in README, skipping table embed')
+        return
+    pre, rest = md.split(start, 1)
+    _, post = rest.split(end, 1)
+    open(rp, 'w').write(pre + start + '\n' + table + end + post)
+    print(f'README table updated ({len(rows)} estates)')
 
 
 if __name__ == '__main__':
